@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk
 import sqlite3
 from tkinter.simpledialog import askstring  # For user input of the date
+from datetime import datetime
 
 # Database connection
 conn = sqlite3.connect("business.db")
@@ -290,7 +291,7 @@ class ProductManagement:
             self.image_label.image = photo  # Keep reference to image to avoid garbage collection
 
     def add_product(self):
-        """Insert product data into the database after checking for duplicates."""
+        """Insert product data into the database after checking for duplicates and validating inputs."""
         name = self.product_name.get()
         price = self.price.get()
         stock = self.stock.get()
@@ -299,17 +300,22 @@ class ProductManagement:
             messagebox.showwarning("Input Error", "Please fill in all fields.")
             return
 
+        # Validate price and stock inputs
+        if not price.isdigit() or not stock.isdigit():
+            messagebox.showerror("Validation Error", "Price and Stock must be numeric values.")
+            return
+
         # Check if a product with the same name already exists
         cursor.execute("SELECT COUNT(*) FROM products WHERE name = ?", (name,))
         if cursor.fetchone()[0] > 0:
             messagebox.showerror("Duplicate Entry", f"A product with the name '{name}' already exists. Please use a unique name.")
             return
 
-        # Insert product data with image path (not storing the image itself in the database)
+        # Insert product data with image path
         image_path = self.selected_image_path if self.selected_image_path else "No image selected"
 
         cursor.execute("""INSERT INTO products (name, price, quantity, image)
-                        VALUES (?, ?, ?, ?)""", (name, price, stock, image_path))
+                        VALUES (?, ?, ?, ?)""", (name, int(price), int(stock), image_path))
         conn.commit()
         messagebox.showinfo("Success", "Product added successfully!")
         self.view_products()
@@ -338,7 +344,7 @@ class ProductManagement:
         self.view_products()
 
     def update_product(self):
-        """Update the selected product's data in the database"""
+        """Update the selected product's data in the database after validating inputs."""
         selected_item = self.tree.selection()
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select a product to update.")
@@ -354,10 +360,15 @@ class ProductManagement:
             messagebox.showwarning("Input Error", "Please fill in all fields.")
             return
 
+        # Validate price and stock inputs
+        if not price.isdigit() or not stock.isdigit():
+            messagebox.showerror("Validation Error", "Price and Stock must be numeric values.")
+            return
+
         cursor.execute("""UPDATE products
-                          SET name = ?, price = ?, quantity = ?, image = ?
-                          WHERE product_id = ?""",
-                       (name, price, stock, image_path, product_id))
+                        SET name = ?, price = ?, quantity = ?, image = ?
+                        WHERE product_id = ?""",
+                    (name, int(price), int(stock), image_path, product_id))
         conn.commit()
         messagebox.showinfo("Success", f"Product ID {product_id} updated successfully!")
         self.view_products()
@@ -714,9 +725,49 @@ class OrderManagement:
         if int(quantity) <= 0:
             messagebox.showerror("Validation Error", "Quantity must be greater than zero.")
             return False
-
         return True
 
+    def validate_references(self, customer_id, product_id):
+        """Validate that customer_id exists in the customers table and product_id exists in the products table."""
+        # Validate customer_id
+        cursor.execute("SELECT * FROM customers WHERE customer_id = ?", (customer_id,))
+        customer = cursor.fetchone()
+        if not customer:
+            messagebox.showerror("Validation Error", "Customer ID does not exist.")
+            return False
+
+        # Validate product_id
+        cursor.execute("SELECT * FROM products WHERE product_id = ?", (product_id,))
+        product = cursor.fetchone()
+        if not product:
+            messagebox.showerror("Validation Error", "Product ID does not exist.")
+            return False
+        return True
+    
+    def validate_numeric_input(self, value, field_name):
+        """Validate that the input is a positive numeric value."""
+        try:
+            numeric_value = float(value)
+            if numeric_value <= 0:
+                raise ValueError
+            return True
+        except ValueError:
+            messagebox.showerror("Validation Error", f"Invalid {field_name}! Please enter a positive number.")
+            return False
+    
+
+    def validate_date_input(self, date_str, field_name="Date"):
+        """Validate that the input is a valid date in YYYY-MM-DD format."""
+        try:
+            # Try parsing the date string into a datetime object
+            datetime.strptime(date_str, "%Y-%m-%d")
+            return True
+        except ValueError:
+            # If parsing fails, show an error message
+            messagebox.showerror("Validation Error", f"Invalid {field_name}! Please enter a valid date in YYYY-MM-DD format.")
+            return False
+
+    
     def add_order(self):
         """Add a new order to the database."""
         customer_id = self.customer_id.get()
@@ -725,7 +776,17 @@ class OrderManagement:
         price = self.price.get()
         order_date = self.date.get()
 
+        # Validate inputs
         if not self.validate_inputs(customer_id, product_id, quantity, price, order_date):
+            return
+
+        if not self.validate_numeric_input(quantity, "Quantity"):
+            return
+
+        if not self.validate_numeric_input(price, "Price"):
+            return
+
+        if not self.validate_date_input(order_date, "Order Date"):
             return
 
         if not self.validate_references(customer_id, product_id):
@@ -743,6 +804,8 @@ class OrderManagement:
         messagebox.showinfo("Success", "Order added successfully!")
         self.view_orders()
 
+
+
     def view_orders(self):
         """Display all orders in the Treeview."""
         for item in self.tree.get_children():
@@ -753,24 +816,6 @@ class OrderManagement:
         for row in rows:
             self.tree.insert("", "end", values=row)
 
-
-    def validate_references(self, customer_id, product_id):
-        """Validate that customer_id exists in the customers table and product_id exists in the products table."""
-        # Validate customer_id
-        cursor.execute("SELECT * FROM customers WHERE customer_id = ?", (customer_id,))
-        customer = cursor.fetchone()
-        if not customer:
-            messagebox.showerror("Validation Error", "Customer ID does not exist.")
-            return False
-
-        # Validate product_id
-        cursor.execute("SELECT * FROM products WHERE product_id = ?", (product_id,))
-        product = cursor.fetchone()
-        if not product:
-            messagebox.showerror("Validation Error", "Product ID does not exist.")
-            return False
-
-        return True
 
 
     def update_order(self):
@@ -787,7 +832,17 @@ class OrderManagement:
         price = self.price.get()
         order_date = self.date.get()
 
+        # Validate inputs
         if not self.validate_inputs(customer_id, product_id, quantity, price, order_date):
+            return
+
+        if not self.validate_numeric_input(quantity, "Quantity"):
+            return
+
+        if not self.validate_numeric_input(price, "Price"):
+            return
+
+        if not self.validate_date_input(order_date, "Order Date"):
             return
 
         if not self.validate_references(customer_id, product_id):
@@ -805,6 +860,7 @@ class OrderManagement:
         conn.commit()
         messagebox.showinfo("Success", f"Order ID {order_id} updated successfully!")
         self.view_orders()
+
 
     def delete_order(self):
         """Delete the selected order."""

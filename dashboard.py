@@ -4,6 +4,7 @@ from PIL import Image, ImageTk
 import sqlite3
 from tkinter.simpledialog import askstring  # For user input of the date
 from datetime import datetime
+import re
 
 # Database connection
 conn = sqlite3.connect("business.db")
@@ -435,7 +436,11 @@ class CustomerManagement:
         if not all([name, phone, email]):
             messagebox.showwarning("Input Error", "Please fill in all fields.")
             return
-
+        
+        if not self.validate_email(email):
+            messagebox.showerror("Invalid Email", "Please provide a valid email address.")
+            return
+        
         cursor.execute("""
             INSERT INTO customers (name, phone, email)
             VALUES (?, ?, ?)
@@ -460,6 +465,8 @@ class CustomerManagement:
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select a customer to update.")
             return
+        
+        
 
         customer_id = self.tree.item(selected_item)["values"][0]
         name = self.customer_name.get()
@@ -468,6 +475,10 @@ class CustomerManagement:
 
         if not all([name, phone, email]):
             messagebox.showwarning("Input Error", "Please fill in all fields.")
+            return
+        
+        if not self.validate_email(email):
+            messagebox.showerror("Invalid Email", "Please provide a valid email address.")
             return
 
         cursor.execute("""
@@ -491,6 +502,11 @@ class CustomerManagement:
         conn.commit()
         messagebox.showinfo("Success", f"Customer ID {customer_id} deleted successfully!")
         self.view_customers()
+
+    def validate_email(self, email):
+        """Validate email format using regex."""
+        email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+        return re.match(email_regex, email)
 
 class EmployeeManagement:
     def __init__(self, frame):
@@ -559,6 +575,10 @@ class EmployeeManagement:
         if not all([name, role, phone, email]):
             messagebox.showwarning("Input Error", "Please fill in all fields.")
             return
+        
+        if not self.validate_email(email):
+            messagebox.showerror("Invalid Email", "Please provide a valid email address.")
+            return
 
         cursor.execute("""
             INSERT INTO employees (name, role, phone, email)
@@ -584,6 +604,8 @@ class EmployeeManagement:
         if not selected_item:
             messagebox.showwarning("Selection Error", "Please select an employee to update.")
             return
+        
+        
 
         employee_id = self.tree.item(selected_item)["values"][0]
         name = self.employee_name.get()
@@ -593,6 +615,10 @@ class EmployeeManagement:
 
         if not all([name, role, phone, email]):
             messagebox.showwarning("Input Error", "Please fill in all fields.")
+            return
+        
+        if not self.validate_email(email):
+            messagebox.showerror("Invalid Email", "Please provide a valid email address.")
             return
 
         cursor.execute("""
@@ -616,6 +642,11 @@ class EmployeeManagement:
         conn.commit()
         messagebox.showinfo("Success", f"Employee ID {employee_id} deleted successfully!")
         self.view_employees()
+
+    def validate_email(self, email):
+        """Validate email format using regex."""
+        email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
+        return re.match(email_regex, email)
 
 class OrderManagement:
     def __init__(self, frame):
